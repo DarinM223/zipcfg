@@ -16,5 +16,20 @@ sig
   val unfocus: zgraph -> graph
 
   (* entry and exit *)
-  val empty : graph
+  val empty: graph
+
+  type nodes = zgraph -> zgraph
+  type machine
+  structure Rtl:
+  sig
+    type rtl
+    type exp
+  end
+  type regs
+
+  (* val label: machine -> label -> nodes *)
+  val instruction: Rtl.rtl -> nodes
+  (* val branch: machine -> label -> nodes
+  val cbranch: machine -> Rtl.exp -> {ifso: label, ifnot: label} -> nodes *)
+  val return: Rtl.rtl -> {uses: regs} -> nodes
 end

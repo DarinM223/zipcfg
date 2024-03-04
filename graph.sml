@@ -2,6 +2,7 @@ functor GraphFn
   (structure Rtl:
    sig
      type rtl
+     type exp
    end
    structure Spans:
    sig
@@ -94,4 +95,21 @@ struct
         (Entry, _) => IntRedBlackMap.insert (graph, entryUid, block)
       | (Label ((uid, _), _, _), _) => IntRedBlackMap.insert (graph, uid, block)
     end
+
+  infixr 3 **>
+  fun op**> (f, x) = f x
+
+  structure Rtl = Rtl
+  type regs = regs
+  type machine = int
+  type nodes = zgraph -> zgraph
+
+  fun instruction rtl ((head, tail), graph) =
+    ((head, Tail (Instruction rtl, tail)), graph)
+  fun return rtl {uses = regs} ((head, _), graph) =
+    ((head, Last (Return (rtl, regs))), graph)
+
+  fun example {rtl1, rtl2, rtl3, regs} (zgraph: zgraph) =
+    instruction rtl1 **> instruction rtl2 **> return rtl3 {uses = regs}
+    **> zgraph
 end
