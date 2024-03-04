@@ -1,0 +1,5 @@
+version = 1
+[workspace]
+root = "zipcfg.mlb"
+[diagnostics]
+5043.severity = "ignore"
