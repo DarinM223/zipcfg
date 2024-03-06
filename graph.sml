@@ -1,9 +1,11 @@
+signature RTL =
+sig
+  type rtl
+  type exp
+end
+
 functor GraphFn
-  (structure Rtl:
-   sig
-     type rtl
-     type exp
-   end
+  (structure Rtl: RTL
    structure Spans:
    sig
      type t
@@ -101,11 +103,22 @@ struct
 
   structure Rtl = Rtl
   type regs = regs
-  type machine = int
+  type machine =
+    { bnegate: Rtl.rtl -> Rtl.rtl
+    , goto: label -> Rtl.rtl
+    , jump: label -> Rtl.rtl
+    , call: label -> Rtl.rtl
+    , return: Rtl.rtl
+    }
   type nodes = zgraph -> zgraph
 
   fun instruction rtl ((head, tail), graph) =
     ((head, Tail (Instruction rtl, tail)), graph)
+  fun label (machine: machine) (label as (uid, _)) ((head, tail), graph) =
+    ( (head, Last (Branch (#goto machine label, label)))
+    , IntRedBlackMap.insert
+        (graph, uid, (Label (label, Local false, ref NONE), tail))
+    )
   fun return rtl {uses = regs} ((head, _), graph) =
     ((head, Last (Return (rtl, regs))), graph)
 

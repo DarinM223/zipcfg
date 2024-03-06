@@ -27,7 +27,7 @@ sig
   end
   type regs
 
-  (* val label: machine -> label -> nodes *)
+  val label: machine -> label -> nodes
   val instruction: Rtl.rtl -> nodes
   (* val branch: machine -> label -> nodes
   val cbranch: machine -> Rtl.exp -> {ifso: label, ifnot: label} -> nodes *)
