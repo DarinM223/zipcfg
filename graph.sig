@@ -1,7 +1,22 @@
+signature TARGET =
+sig
+  type label
+  (* A target instruction is the simplified equivalent to Rtl.rtl for qc--. *)
+  type instr
+  val showLabel: label -> string
+  val showInstr: instr -> string
+
+  datatype cond = LT | LE | GT | GE | EQ | NE
+  val goto: label -> instr (* j <label> *)
+  val cbranch: cond -> label -> label -> instr
+  val return: instr (* ret *)
+end
+
 signature GRAPH =
 sig
   type uid
   type label = uid * string
+  structure Target: TARGET where type label = label
 
   type graph
   type zgraph
@@ -19,17 +34,13 @@ sig
   val empty: graph
 
   type nodes = zgraph -> zgraph
-  type machine
-  structure Rtl:
-  sig
-    type rtl
-    type exp
-  end
   type regs
 
-  val label: machine -> label -> nodes
-  val instruction: Rtl.rtl -> nodes
-  (* val branch: machine -> label -> nodes
-  val cbranch: machine -> Rtl.exp -> {ifso: label, ifnot: label} -> nodes *)
-  val return: Rtl.rtl -> {uses: regs} -> nodes
+  val label: label -> nodes
+  val instruction: Target.instr -> nodes
+  val branch: label -> nodes
+  (* val cbranch: machine -> Rtl.exp -> {ifso: label, ifnot: label} -> nodes *)
+  val return: {uses: regs} -> nodes
+
+  val showGraph: graph -> string
 end
