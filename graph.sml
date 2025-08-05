@@ -1,7 +1,9 @@
 functor GraphFn
   (structure Target: TARGET where type label = int * string
    type regs
-   val showRegs: regs -> string): GRAPH =
+   val showRegs: regs -> string) :> GRAPH
+                                    where type Target.instr = Target.instr
+                                    and type regs = regs =
 struct
   structure Target = Target
   type uid = int
@@ -50,6 +52,11 @@ struct
 
   val unzip: block -> zblock = fn (first, tail) => (First first, tail)
 
+  val rec firstt: head -> first = fn First f => f | Head (h, _) => firstt h
+  val first: zblock -> first = fn (h, _) => firstt h
+  val rec lastt: tail -> last = fn Last l => l | Tail (_, t) => lastt t
+  val last: zblock -> last = fn (_, t) => lastt t
+
   val gotoStart: zblock -> first * tail = zip
   val rec gotoEnd: zblock -> head * last =
     fn (head, Last last) => (head, last)
@@ -73,13 +80,87 @@ struct
     in
       ((head, Last last), graph)
     end
-  val unfocus = fn (zblock, graph) =>
+
+  fun insertBlock block graph =
+    case block of
+      (Entry, _) => IntRedBlackMap.insert (graph, entryUid, block)
+    | (Label ((uid, _), _), _) => IntRedBlackMap.insert (graph, uid, block)
+
+  val unfocus = fn (zblock, graph) => insertBlock (zip zblock) graph
+
+  (* More ways to combine parts *)
+  fun htToFirst (head: head) (tail: tail) : first * tail =
+    case head of
+      First f => (f, tail)
+    | Head (h, m) => htToFirst h (Tail (m, tail))
+  fun htToLast (head: head) (tail: tail) : head * last =
+    case tail of
+      Last l => (head, l)
+    | Tail (m, l) => htToLast (Head (head, m)) l
+
+  local
+    fun prepareForSplicing (graph: graph) (single: tail -> 'a)
+      (multi: {entry: tail, exit: head, rest: graph} -> 'a) : 'a =
+      let
+        (* Ignore the head of the entry block in the spliced graph since we want
+           to keep the head of the original block *)
+        val ((_, entryTail), graph) = entry graph
+      in
+        if IntRedBlackMap.isEmpty graph then
+          (* single block graph *)
+          case lastt entryTail of
+            Exit => single entryTail
+          | _ => raise Fail "not a single exit block"
+        else
+          let
+            (* multi block graph, go to exit *)
+            val (exitBlock, graph) = exit graph
+            val (exitHead, exitLast) = gotoEnd exitBlock
+          in
+            case exitLast of
+              Exit => multi {entry = entryTail, exit = exitHead, rest = graph}
+            | _ => raise Fail "not a single exit graph"
+          end
+      end
+  in
+    (* Result: head ... graph's head *)
+    fun spliceHead (head: head) (graph: graph) : graph * head =
+      let
+        fun spliceOneBlock tail' =
+          case htToLast head tail' of
+            (head, Exit) => (empty, head)
+          | _ => raise Fail "spliced graph without exit"
+        fun spliceManyBlocks {entry, exit, rest} =
+          (insertBlock (htToFirst head entry) rest, exit)
+      in
+        prepareForSplicing graph spliceOneBlock spliceManyBlocks
+      end
+    (* Result: graph's tail ... tail *)
+    fun spliceTail (graph: graph) (tail: tail) : tail * graph =
+      let
+        fun spliceOneBlock tail' =
+          (* For the one block case the first will always be entry
+             so we can use this to convert tail to head *)
+          case htToLast (First Entry) tail' of
+            (head, Exit) =>
+              (case htToFirst head tail of
+                 (Entry, tail'') => (tail'', empty)
+               | _ => raise Fail "impossible, head is not an entry")
+          | _ => raise Fail "spliced graph without exit"
+        fun spliceManyBlocks {entry, exit, rest} =
+          (entry, insertBlock (htToFirst exit tail) rest)
+      in
+        prepareForSplicing graph spliceOneBlock spliceManyBlocks
+      end
+  end
+
+  fun removeEntry graph =
     let
-      val block = zip zblock
+      val (gentry, graph) = entry graph
     in
-      case block of
-        (Entry, _) => IntRedBlackMap.insert (graph, entryUid, block)
-      | (Label ((uid, _), _), _) => IntRedBlackMap.insert (graph, uid, block)
+      case gentry of
+        (First Entry, tail) => (tail, graph)
+      | _ => raise Fail "removing nonexistent entry"
     end
 
   type regs = regs
@@ -87,9 +168,9 @@ struct
 
   fun instruction instr ((head, tail), graph) =
     ((head, Tail (Instruction instr, tail)), graph)
-  fun label (label as (uid, _)) ((head, tail), graph) =
+  fun label label ((head, tail), graph) =
     ( (head, Last (Branch (Target.goto label, label)))
-    , IntRedBlackMap.insert (graph, uid, (Label (label, Local false), tail))
+    , insertBlock (Label (label, Local false), tail) graph
     )
 
   fun unreachable (Last (Branch _)) = ()
@@ -203,9 +284,7 @@ struct
     "["
     ^
     String.concatWith ", "
-      (List.map
-         (fn (i: int, block: block) =>
-            "(" ^ Int.toString i ^ ", " ^ showValue block ^ ")")
+      (List.map (fn (k, v) => "(" ^ Int.toString k ^ ", " ^ showValue v ^ ")")
          (IntRedBlackMap.listItemsi g)) ^ "]"
   val showGraph = showMap showBlock
   val showZgraph = fn (t0, t1) =>
@@ -238,6 +317,9 @@ struct
   val return = "ret"
 end
 
+infixr 3 **>
+fun op**> (f, x) = f x
+
 (* Example *)
 local
   structure TestGraph =
@@ -247,8 +329,6 @@ local
        val showRegs = fn t0 =>
          "[" ^ String.concatWith ", " (List.map Int.toString t0) ^ "]")
   open TestGraph
-  infixr 3 **>
-  fun op**> (f, x) = f x
 in
   val example: nodes = fn zgraph =>
     instruction "a" **> instruction "b" **> return {uses = []} **> zgraph
