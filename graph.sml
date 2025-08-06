@@ -81,12 +81,17 @@ struct
       ((head, Last last), graph)
     end
 
-  fun insertBlock block graph =
-    case block of
-      (Entry, _) => IntRedBlackMap.insert (graph, entryUid, block)
-    | (Label ((uid, _), _), _) => IntRedBlackMap.insert (graph, uid, block)
+  structure Blocks =
+  struct
+    fun insert block graph =
+      case block of
+        (Entry, _) => IntRedBlackMap.insert (graph, entryUid, block)
+      | (Label ((uid, _), _), _) => IntRedBlackMap.insert (graph, uid, block)
+    fun union graph1 graph2 =
+      IntRedBlackMap.unionWith (fn (a, _) => a) (graph1, graph2)
+  end
 
-  val unfocus = fn (zblock, graph) => insertBlock (zip zblock) graph
+  val unfocus = fn (zblock, graph) => Blocks.insert (zip zblock) graph
 
   (* More ways to combine parts *)
   fun htToFirst (head: head) (tail: tail) : first * tail =
@@ -131,7 +136,7 @@ struct
             (head, Exit) => (empty, head)
           | _ => raise Fail "spliced graph without exit"
         fun spliceManyBlocks {entry, exit, rest} =
-          (insertBlock (htToFirst head entry) rest, exit)
+          (Blocks.insert (htToFirst head entry) rest, exit)
       in
         prepareForSplicing graph spliceOneBlock spliceManyBlocks
       end
@@ -148,11 +153,20 @@ struct
                | _ => raise Fail "impossible, head is not an entry")
           | _ => raise Fail "spliced graph without exit"
         fun spliceManyBlocks {entry, exit, rest} =
-          (entry, insertBlock (htToFirst exit tail) rest)
+          (entry, Blocks.insert (htToFirst exit tail) rest)
       in
         prepareForSplicing graph spliceOneBlock spliceManyBlocks
       end
   end
+
+  fun spliceHeadOnly (head: head) (graph: graph) : graph =
+    let
+      val (gentry, graph) = entry graph
+    in
+      case gentry of
+        (First Entry, tail) => Blocks.insert (htToFirst head tail) graph
+      | _ => raise Fail "graph to splice doesn't start with entry"
+    end
 
   fun removeEntry graph =
     let
@@ -163,6 +177,29 @@ struct
       | _ => raise Fail "removing nonexistent entry"
     end
 
+  fun spliceFocusEntry (((head, tail), blocks): zgraph) (graph: graph) : zgraph =
+    let val (tail, blocks') = spliceTail graph tail
+    in ((head, tail), Blocks.union blocks' blocks)
+    end
+  fun spliceFocusExit (((head, tail), blocks): zgraph) (graph: graph) : zgraph =
+    let val (blocks', head) = spliceHead head graph
+    in ((head, tail), Blocks.union blocks' blocks)
+    end
+
+  fun expand (expandMiddle: middle -> graph) (expandLast: last -> graph) graph =
+    let
+      fun expandTail (((head, tail), blocks): zgraph) : graph =
+        case tail of
+          Tail (middle, tail) =>
+            expandTail
+              (spliceFocusExit ((head, tail), blocks) (expandMiddle middle))
+        | Last l => Blocks.union (spliceHeadOnly head (expandLast l)) blocks
+      fun expandBlock (block, expanded) =
+        expandTail (unzip block, expanded)
+    in
+      IntRedBlackMap.foldl expandBlock empty graph
+    end
+
   type regs = regs
   type nodes = zgraph -> zgraph
 
@@ -170,7 +207,7 @@ struct
     ((head, Tail (Instruction instr, tail)), graph)
   fun label label ((head, tail), graph) =
     ( (head, Last (Branch (Target.goto label, label)))
-    , insertBlock (Label (label, Local false), tail) graph
+    , Blocks.insert (Label (label, Local false), tail) graph
     )
 
   fun unreachable (Last (Branch _)) = ()

@@ -75,9 +75,21 @@ sig
   val spliceHead: head -> graph -> graph * head
   (* splice a single-entry, single-exit graph onto a tail *)
   val spliceTail: graph -> tail -> tail * graph
+  (* splice a single-entry, no-exit graph onto a head *)
+  val spliceHeadOnly: head -> graph -> graph
   (* find entry node and remove it, leaving a tail
      leading into the rest of the graph *)
   val removeEntry: graph -> tail * graph
+
+  (* splice a graph into the current focus, new focus is at
+     the entry edge of the spliced graph *)
+  val spliceFocusEntry: zgraph -> graph -> zgraph
+  (* splice a graph into the current focus, new focus is at
+     the exit edge of the spliced graph *)
+  val spliceFocusExit: zgraph -> graph -> zgraph
+
+  (* rewrite graph, every nontrivial node is replaced with a new subgraph *)
+  val expand: (middle -> graph) -> (last -> graph) -> graph -> graph
 
   type nodes = zgraph -> zgraph
 
