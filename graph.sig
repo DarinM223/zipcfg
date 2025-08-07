@@ -15,6 +15,9 @@ end
 signature GRAPH =
 sig
   type uid
+  val uidEq: uid -> uid -> bool
+  val entryUid: uid
+
   type label = uid * string
   structure Target: TARGET where type label = label
   type regs
@@ -52,6 +55,7 @@ sig
   type graph = block IntRedBlackMap.map
   type zgraph = zblock * graph
 
+  val id: block -> uid
   val zip: zblock -> block
   val unzip: block -> zblock
   val gotoStart: zblock -> first * tail
@@ -90,6 +94,8 @@ sig
 
   (* rewrite graph, every nontrivial node is replaced with a new subgraph *)
   val expand: (middle -> graph) -> (last -> graph) -> graph -> graph
+
+  val postorderDfs: graph -> block list
 
   type nodes = zgraph -> zgraph
 

@@ -3,3 +3,4 @@ Group is
   $/smlnj-lib.cm
   graph.sig
   graph.sml
+  dataflow.sml

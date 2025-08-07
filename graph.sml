@@ -2,11 +2,15 @@ functor GraphFn
   (structure Target: TARGET where type label = int * string
    type regs
    val showRegs: regs -> string) :> GRAPH
-                                    where type Target.instr = Target.instr
+                                    where type uid = int
+                                    and type Target.instr = Target.instr
                                     and type regs = regs =
 struct
   structure Target = Target
   type uid = int
+  fun uidEq a b = a = b
+  val entryUid = 0
+
   type label = uid * string
 
   datatype locall = Local of bool
@@ -43,8 +47,8 @@ struct
   type graph = block IntRedBlackMap.map
   type zgraph = zblock * block IntRedBlackMap.map
 
-  val entryUid = 0
-  val empty = IntRedBlackMap.singleton (0, (Entry, Last Exit))
+  val id = fn (Entry, _) => entryUid | (Label ((uid, _), _), _) => uid
+  val empty = IntRedBlackMap.singleton (entryUid, (Entry, Last Exit))
 
   val rec zip: zblock -> block =
     fn (First first, tail) => (first, tail)
@@ -198,6 +202,34 @@ struct
         expandTail (unzip block, expanded)
     in
       IntRedBlackMap.foldl expandBlock empty graph
+    end
+
+  fun successors Exit = []
+    | successors (Branch (_, l)) = [l]
+    | successors (CBranch (_, l1, l2)) = [l1, l2]
+    | successors (Call {callContedges, ...}) = List.map #node callContedges
+    | successors (Return _) = []
+
+  fun postorderDfs (graph: graph) : block list =
+    let
+      fun goBlock uid visited acc k : block list =
+        if IntRedBlackSet.member (visited, uid) then
+          k (acc, visited)
+        else
+          let
+            val visited = IntRedBlackSet.add (visited, uid)
+            val (gentry, _) = focus uid graph
+            val succs: uid list = (List.rev o List.map #1)
+              (successors (last gentry))
+          in
+            goChildren visited (zip gentry :: acc) succs k
+          end
+      and goChildren visited acc (uid :: uids) k =
+            goBlock uid visited acc (fn (acc, visited) =>
+              goChildren visited acc uids k)
+        | goChildren visited acc [] k = k (acc, visited)
+    in
+      goBlock entryUid IntRedBlackSet.empty [] (fn (acc, _) => acc)
     end
 
   type regs = regs
@@ -366,9 +398,28 @@ local
        val showRegs = fn t0 =>
          "[" ^ String.concatWith ", " (List.map Int.toString t0) ^ "]")
   open TestGraph
-in
+
   val example: nodes = fn zgraph =>
     instruction "a" **> instruction "b" **> return {uses = []} **> zgraph
-  val example = unfocus (example (entry empty))
+  val example: graph = unfocus (example (entry empty))
+
+  val testPostorder: graph =
+    List.foldl (fn ((k, v), acc) => IntRedBlackMap.insert (acc, k, v))
+      IntRedBlackMap.empty
+      [ (entryUid, (Entry, Last (CBranch ("", (1, ""), (2, "")))))
+      , ( 1
+        , (Label ((1, ""), Local false), Last (CBranch ("", (3, ""), (4, ""))))
+        )
+      , (2, (Label ((2, ""), Local false), Last Exit))
+      , (3, (Label ((3, ""), Local false), Last Exit))
+      , (4, (Label ((4, ""), Local false), Last Exit))
+      ]
+  val postorder = List.map id (postorderDfs testPostorder)
+  val showUids = fn t0 =>
+    "[" ^ String.concatWith ", " (List.map Int.toString t0) ^ "]"
+in
+  (* Prints [(0, (Entry, Tail (Instruction (a), Tail (Instruction (b), Last (Return (ret, []))))))] *)
   val () = print (showGraph example ^ "\n")
+  (* Prints [3, 4, 1, 2, 0] *)
+  val () = print ("Postorder: " ^ showUids postorder ^ "\n")
 end
