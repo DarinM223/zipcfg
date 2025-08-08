@@ -55,6 +55,12 @@ sig
   type graph = block IntRedBlackMap.map
   type zgraph = zblock * graph
 
+  structure Blocks:
+  sig
+    val insert: block -> graph -> graph
+    val union: graph -> graph -> graph
+  end
+
   val id: block -> uid
   val zip: zblock -> block
   val unzip: block -> zblock
@@ -95,7 +101,10 @@ sig
   (* rewrite graph, every nontrivial node is replaced with a new subgraph *)
   val expand: (middle -> graph) -> (last -> graph) -> graph -> graph
 
-  val postorderDfs: graph -> block list
+  (* returns a list in roughly first-to-last order. visiting blocks in this
+     order helps a forward dataflow analysis converge quickly. visiting blocks
+     in the reverse of this order helps a backward analysis converge quickly *)
+  val reversePostorderDfs: graph -> block list
 
   type nodes = zgraph -> zgraph
 

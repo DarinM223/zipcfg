@@ -210,26 +210,38 @@ struct
     | successors (Call {callContedges, ...}) = List.map #node callContedges
     | successors (Return _) = []
 
-  fun postorderDfs (graph: graph) : block list =
+  fun reversePostorderDfs (graph: graph) : block list =
     let
-      fun goBlock uid visited acc k : block list =
-        if IntRedBlackSet.member (visited, uid) then
-          k (acc, visited)
-        else
-          let
-            val visited = IntRedBlackSet.add (visited, uid)
-            val (gentry, _) = focus uid graph
-            val succs: uid list = (List.rev o List.map #1)
-              (successors (last gentry))
-          in
-            goChildren visited (zip gentry :: acc) succs k
-          end
-      and goChildren visited acc (uid :: uids) k =
-            goBlock uid visited acc (fn (acc, visited) =>
-              goChildren visited acc uids k)
-        | goChildren visited acc [] k = k (acc, visited)
+      val (entry, blocks) = entry graph
+      fun vnode block acc visited k =
+        let
+          val u = id block
+        in
+          if IntRedBlackSet.member (visited, u) then
+            k (acc, visited)
+          else
+            vchildren block (getChildren block) acc
+              (IntRedBlackSet.add (visited, u)) k
+        end
+      and getChildren block =
+        let
+          val uids = List.map #1 (successors (last (unzip block)))
+        in
+          List.foldl
+            (fn (bid, acc) => IntRedBlackMap.lookup (blocks, bid) :: acc
+                              handle LibBase.NotFound => acc) [] uids
+        end
+      and vchildren block children acc visited k =
+        let
+          fun next children (acc, visited) =
+            case children of
+              [] => k (block :: acc, visited)
+            | n :: rst => vnode n acc visited (next rst)
+        in
+          next children (acc, visited)
+        end
     in
-      goBlock entryUid IntRedBlackSet.empty [] (fn (acc, _) => acc)
+      vnode (zip entry) [] IntRedBlackSet.empty (fn (acc, _) => acc)
     end
 
   type regs = regs
@@ -414,12 +426,12 @@ local
       , (3, (Label ((3, ""), Local false), Last Exit))
       , (4, (Label ((4, ""), Local false), Last Exit))
       ]
-  val postorder = List.map id (postorderDfs testPostorder)
+  val rpo = List.map id (reversePostorderDfs testPostorder)
   val showUids = fn t0 =>
     "[" ^ String.concatWith ", " (List.map Int.toString t0) ^ "]"
 in
   (* Prints [(0, (Entry, Tail (Instruction (a), Tail (Instruction (b), Last (Return (ret, []))))))] *)
   val () = print (showGraph example ^ "\n")
-  (* Prints [3, 4, 1, 2, 0] *)
-  val () = print ("Postorder: " ^ showUids postorder ^ "\n")
+  (* Prints [0, 1, 3, 4, 2] *)
+  val () = print ("Reverse Postorder: " ^ showUids rpo ^ "\n")
 end
