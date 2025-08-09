@@ -1,1 +1,10 @@
 zipcfg
+.cm/
+
+# PolyML specific
+build.sml
+
+# MLKit specific
+mlkit-stubs.sml
+smlnj-lib.mlb
+MLB/

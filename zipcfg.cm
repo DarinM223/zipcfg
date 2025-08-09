@@ -2,5 +2,6 @@ Group is
   $/basis.cm
   $/smlnj-lib.cm
   graph.sig
-  graph.sml
-  dataflow.sml
+  graph.fun
+  dataflow.fun
+  examples.sml

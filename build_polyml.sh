@@ -1,5 +1,6 @@
 #!/bin/bash
 cat > build.sml <<EOL
+structure Int64 = Int63
 structure Unsafe =
 struct
   structure Basis =
