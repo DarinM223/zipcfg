@@ -1,4 +1,4 @@
-functor Dataflow (structure G: GRAPH) =
+functor DataflowFn (structure G: GRAPH) =
 struct
   type 'a fact =
     { init_info: 'a (* lattice bottom element *)

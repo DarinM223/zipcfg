@@ -262,6 +262,12 @@ struct
     ( unreachable tail
     ; ((head, Last (Branch (Target.goto label, label))), graph)
     )
+  fun cbranch cond {ifso, ifnot} ((head, tail), graph) =
+    ( unreachable tail
+    ; ( (head, Last (CBranch (Target.cbranch cond ifso ifnot, ifso, ifnot)))
+      , graph
+      )
+    )
   fun return {uses = regs} ((head, tail), graph) =
     (unreachable tail; ((head, Last (Return (Target.return, regs))), graph))
 

@@ -111,7 +111,7 @@ sig
   val label: label -> nodes
   val instruction: Target.instr -> nodes
   val branch: label -> nodes
-  (* val cbranch: machine -> Rtl.exp -> {ifso: label, ifnot: label} -> nodes *)
+  val cbranch: Target.cond -> {ifso: label, ifnot: label} -> nodes
   val return: {uses: regs} -> nodes
 
   val showBlock: block -> string
