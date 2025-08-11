@@ -103,30 +103,41 @@ local
     , defs = (AtomRedBlackSet.fromList o List.map Atom.atom) defs
     }
 
-  type gen_kill = {gen: AtomRedBlackSet.set, kill: AtomRedBlackSet.set}
-  val genKillTable: gen_kill IntHashTable.hash_table =
+  type live_in = AtomRedBlackSet.set
+  fun showLive live =
+    AtomRedBlackSet.foldl (fn (atom, acc) => acc ^ Atom.toString atom ^ " ")
+      "{ " live ^ "}"
+  val genKillTable: live_in IntHashTable.hash_table =
     IntHashTable.mkTable (100, LibBase.NotFound)
-  val livenessFact: gen_kill fact =
-    { init_info = {gen = AtomRedBlackSet.empty, kill = AtomRedBlackSet.empty}
-    , add_info = fn a =>
-        fn b =>
-          { gen = AtomRedBlackSet.union (#gen a, #gen b)
-          , kill = AtomRedBlackSet.union (#kill a, #kill b)
-          }
+  val livenessFact: live_in fact =
+    { init_info = AtomRedBlackSet.empty
+    , add_info = fn a => fn b => AtomRedBlackSet.union (a, b)
     , changed = fn {old, new} =>
-        AtomRedBlackSet.equal (#gen old, #gen new)
-        andalso AtomRedBlackSet.equal (#kill old, #kill new)
+        AtomRedBlackSet.numItems new > AtomRedBlackSet.numItems old
     , get = IntHashTable.lookup genKillTable
     , set = fn uid => fn v => IntHashTable.insert genKillTable (uid, v)
     }
-  val livenessAnalysis: gen_kill analysis_functions =
-    { first_in = fn a => fn first => raise Fail ""
-    , middle_in = fn a => fn middle => raise Fail ""
-    , last_in = fn last =>
-        (* TODO: livenessFact is still available, can call `get` on outedges if needed *)
-        raise Fail ""
+  fun handleInstruction ({uses, defs}, _) a =
+    AtomRedBlackSet.union (uses, AtomRedBlackSet.difference (a, defs))
+  val calcLiveOut: TestGraph.last -> live_in =
+    fn Exit => AtomRedBlackSet.empty
+     | Branch (_, (uid, _)) => #get livenessFact uid
+     | CBranch (instr, (uid1, _), (uid2, _)) =>
+      handleInstruction instr (AtomRedBlackSet.union
+        (#get livenessFact uid1, #get livenessFact uid2))
+     | Call {callInstr, callContedges, ...} =>
+      handleInstruction callInstr
+        (List.foldl
+           (fn ({node = (uid, _), ...}, acc) =>
+              AtomRedBlackSet.union (acc, #get livenessFact uid))
+           AtomRedBlackSet.empty callContedges)
+     | Return (instr, _) => handleInstruction instr AtomRedBlackSet.empty
+  val livenessAnalysis: live_in analysis_functions =
+    { first_in = fn a => fn _ => a
+    , middle_in = fn a => fn Instruction instr => handleInstruction instr a
+    , last_in = calcLiveOut
     }
-  val livenessAnalysis: gen_kill analysis = (livenessFact, livenessAnalysis)
+  val livenessAnalysis: live_in analysis = (livenessFact, livenessAnalysis)
   val testLiveness: graph =
     List.foldl (fn ((k, v), acc) => IntRedBlackMap.insert (acc, k, v))
       IntRedBlackMap.empty
@@ -160,7 +171,7 @@ local
               , Tail
                   ( Instruction (usesDefs ["%3"] ["%3"], "sub %3, %3, 1")
                   , Last (CBranch
-                      ((usesDefs ["%3", "%0"] [], "%3 == %0"), (4, ""), (3, "")))
+                      ((usesDefs ["%3"] [], "%3 == 0"), (4, ""), (3, "")))
                   )
               )
           )
@@ -189,31 +200,30 @@ local
       , (5, (Label ((5, ""), Local false), Last Exit))
       ]
 in
+  (* Should print:
+     Liveness iterations: 3
+     Block 0 livein: { %4 %5 %6 %7 %8 }
+     Block 0 liveout: { %4 %5 %6 %7 %8 }
+     Block 1 livein: { %4 %5 %6 %7 %8 }
+     Block 1 liveout: { %2 %3 %7 %8 }
+     Block 2 livein: { %2 %3 %7 %8 }
+     Block 2 liveout: { %3 %7 %8 }
+     Block 3 livein: { %3 %7 %8 }
+     Block 3 liveout: { %3 %7 %8 }
+     Block 4 livein: { %3 %7 %8 }
+     Block 4 liveout: { %2 %3 %7 %8 }
+     Block 5 livein: { }
+     Block 5 liveout: { }
+  *)
+  val iterations = runAnalysis livenessAnalysis testLiveness
+  val () = print ("Liveness iterations: " ^ Int.toString iterations ^ "\n")
+  fun printBlock (i, block) =
+    let
+      val liveIn = #get livenessFact i
+      val liveOut = calcLiveOut (#2 (gotoEnd (unzip block)))
+    in
+      print ("Block " ^ Int.toString i ^ " livein: " ^ showLive liveIn ^ "\n");
+      print ("Block " ^ Int.toString i ^ " liveout: " ^ showLive liveOut ^ "\n")
+    end
+  val () = IntRedBlackMap.appi printBlock testLiveness
 end
-
-(*
-
-block -2 predecessors: [7] successors: [] {
-}
-block -1 predecessors: [] successors: [0] {
-  %-1 <- START()
-}
-block 0 predecessors: [-1] successors: [3] {
-  %2 <- 1 - %4
-  %3 <- := %5
-  %1 <- := %6
-}
-block 3 predecessors: [0, 7] successors: [7, 6] {
-  %2 <- %2 + 1
-  %3 <- %3 - 1
-  7 <- %3 == 0
-}
-block 6 predecessors: [3] successors: [7] {
-  %1 <- := %7
-}
-block 7 predecessors: [3, 6] successors: [3, -2] {
-  %2 <- := %8
-  3 <- %2 < 5
-}
-
-*)
