@@ -1,6 +1,7 @@
 signature TARGET =
 sig
   type label
+  type reg
   (* A target instruction is the simplified equivalent to Rtl.rtl for qc--. *)
   type instr
   val showLabel: label -> string
@@ -8,8 +9,8 @@ sig
 
   datatype cond = LT | LE | GT | GE | EQ | NE
   val goto: label -> instr (* j <label> *)
-  val cbranch: cond -> label -> label -> instr
-  val return: instr (* ret *)
+  val cbranch: {uses: reg list} -> cond -> label -> label -> instr
+  val return: {uses: reg list} -> instr (* ret *)
 end
 
 signature GRAPH =
@@ -20,7 +21,7 @@ sig
 
   type label = uid * string
   structure Target: TARGET where type label = label
-  type regs
+  type regs = Target.reg list
 
   datatype locall = Local of bool
   datatype first = Entry | Label of label * locall
@@ -111,7 +112,10 @@ sig
   val label: label -> nodes
   val instruction: Target.instr -> nodes
   val branch: label -> nodes
-  val cbranch: Target.cond -> {ifso: label, ifnot: label} -> nodes
+  val cbranch: {uses: regs}
+               -> Target.cond
+               -> {ifso: label, ifnot: label}
+               -> nodes
   val return: {uses: regs} -> nodes
 
   val showBlock: block -> string

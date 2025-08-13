@@ -3,6 +3,7 @@ fun op**> (f, x) = f x
 
 structure Target: TARGET =
 struct
+  type reg = string
   type label = int * string
   (* A target instruction is the simplified equivalent to Rtl.rtl for qc--. *)
   type instr = string
@@ -11,7 +12,7 @@ struct
 
   datatype cond = LT | LE | GT | GE | EQ | NE
   fun goto (_, label) = "j " ^ label
-  fun cbranch cond (_, l1) l2 =
+  fun cbranch _ cond (_, l1) l2 =
     let
       val instr =
         case cond of
@@ -24,7 +25,7 @@ struct
     in
       instr ^ l1 ^ "\n" ^ goto l2
     end
-  val return = "ret"
+  val return = fn _ => "ret"
 end
 
 (* Example *)
@@ -32,9 +33,7 @@ local
   structure TestGraph =
     GraphFn
       (structure Target = Target
-       type regs = int list
-       val showRegs = fn t0 =>
-         "[" ^ String.concatWith ", " (List.map Int.toString t0) ^ "]")
+       val showRegs = fn t0 => "[" ^ String.concatWith ", " t0 ^ "]")
   open TestGraph
 
   val example: nodes = fn zgraph =>
@@ -64,6 +63,7 @@ end
 
 structure Target: TARGET =
 struct
+  type reg = string
   type label = int * string
   (* A target instruction is the simplified equivalent to Rtl.rtl for qc--. *)
   type instr = {uses: AtomRedBlackSet.set, defs: AtomRedBlackSet.set} * string
@@ -73,7 +73,7 @@ struct
 
   datatype cond = LT | LE | GT | GE | EQ | NE
   fun goto (_, label) = (defUseDefs, "j " ^ label)
-  fun cbranch cond (_, l1) l2 =
+  fun cbranch {uses} cond (_, l1) l2 =
     let
       val instr =
         case cond of
@@ -84,18 +84,20 @@ struct
         | EQ => "jz "
         | NE => "jnz "
     in
-      (defUseDefs, instr ^ l1 ^ "\n" ^ #2 (goto l2))
+      ( { uses = AtomRedBlackSet.fromList (List.map Atom.atom uses)
+        , defs = AtomRedBlackSet.empty
+        }
+      , instr ^ l1 ^ "\n" ^ #2 (goto l2)
+      )
     end
-  val return = (defUseDefs, "ret")
+  val return = fn _ => (defUseDefs, "ret")
 end
 
 local
   structure TestGraph =
     GraphFn
       (structure Target = Target
-       type regs = int list
-       val showRegs = fn t0 =>
-         "[" ^ String.concatWith ", " (List.map Int.toString t0) ^ "]")
+       val showRegs = fn t0 => "[" ^ String.concatWith ", " t0 ^ "]")
   structure Dataflow = DataflowFn (structure G = TestGraph)
   open TestGraph Dataflow
   fun usesDefs (uses: string list) (defs: string list) =
@@ -138,67 +140,18 @@ local
     , last_in = calcLiveOut
     }
   val livenessAnalysis: live_in analysis = (livenessFact, livenessAnalysis)
-  val testLiveness: graph =
-    List.foldl (fn ((k, v), acc) => IntRedBlackMap.insert (acc, k, v))
-      IntRedBlackMap.empty
-      [ (entryUid, (Entry, Last (Branch (Target.goto (1, ""), (1, "")))))
-      , (* %2 <- 1 - %4
-           %3 <- %5
-           %1 <- %6
-         *)
-        ( 1
-        , ( Label ((1, ""), Local false)
-          , Tail
-              ( Instruction (usesDefs ["%4"] ["%2"], "sub %2, 1, %4")
-              , Tail
-                  ( Instruction (usesDefs ["%5"] ["%3"], "mov %3, %5")
-                  , Tail
-                      ( Instruction (usesDefs ["%6"] ["%1"], "mov %1, %6")
-                      , Last (Branch (Target.goto (2, ""), (2, "")))
-                      )
-                  )
-              )
-          )
-        )
-      , (* %2 <- %2 + 1
-           %3 <- %3 - 1
-           4 <- %3 == 0
-         *)
-        ( 2
-        , ( Label ((2, ""), Local false)
-          , Tail
-              ( Instruction (usesDefs ["%2"] ["%2"], "add %2, %2, 1")
-              , Tail
-                  ( Instruction (usesDefs ["%3"] ["%3"], "sub %3, %3, 1")
-                  , Last (CBranch
-                      ((usesDefs ["%3"] [], "%3 == 0"), (4, ""), (3, "")))
-                  )
-              )
-          )
-        )
-      , (* %1 <- %7 *)
-        ( 3
-        , ( Label ((3, ""), Local false)
-          , Tail
-              ( Instruction (usesDefs ["%7"] ["%1"], "mov %1, %7")
-              , Last (Branch (Target.goto (4, ""), (4, "")))
-              )
-          )
-        )
-      , (* %2 <- %8
-           2 <- %2 < 5
-         *)
-        ( 4
-        , ( Label ((4, ""), Local false)
-          , Tail
-              ( Instruction (usesDefs ["%8"] ["%2"], "mov %2, %8")
-              , Last (CBranch
-                  ((usesDefs ["%2"] [], "%2 < 5"), (2, ""), (5, "")))
-              )
-          )
-        )
-      , (5, (Label ((5, ""), Local false), Last Exit))
-      ]
+  val testLiveness: zgraph =
+    label (1, "") **> instruction (usesDefs ["%4"] ["%2"], "sub %2, 1, %4")
+    **> instruction (usesDefs ["%5"] ["%3"], "mov %3, %5")
+    **> instruction (usesDefs ["%6"] ["%1"], "mov %1, %6") **> label (2, "")
+    **> instruction (usesDefs ["%2"] ["%2"], "add %2, %2, 1")
+    **> instruction (usesDefs ["%3"] ["%3"], "sub %3, %3, 1")
+    **> cbranch {uses = ["%3"]} Target.EQ {ifso = (4, ""), ifnot = (3, "")}
+    **> label (3, "") **> instruction (usesDefs ["%7"] ["%1"], "mov %1, %7")
+    **> label (4, "") **> instruction (usesDefs ["%8"] ["%2"], "mov %2, %8")
+    **> cbranch {uses = ["%2"]} Target.LT {ifso = (2, ""), ifnot = (5, "")}
+    **> label (5, "") **> entry empty
+  val testLiveness = unfocus testLiveness
 in
   (* Should print:
      Liveness iterations: 3
