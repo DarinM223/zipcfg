@@ -65,6 +65,10 @@ sig
   val id: block -> uid
   val zip: zblock -> block
   val unzip: block -> zblock
+  val firstt: head -> first
+  val first: zblock -> first
+  val lastt: tail -> last
+  val last: zblock -> last
   val gotoStart: zblock -> first * tail
   val gotoEnd: zblock -> head * last
 

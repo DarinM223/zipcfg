@@ -47,6 +47,7 @@ struct
 
   type graph = block IntRedBlackMap.map
   type zgraph = zblock * block IntRedBlackMap.map
+  type nodes = zgraph -> zgraph
 
   val id = fn (Entry, _) => entryUid | (Label ((uid, _), _), _) => uid
   val empty = IntRedBlackMap.singleton (entryUid, (Entry, Last Exit))
@@ -245,9 +246,6 @@ struct
       vnode (zip entry) [] IntRedBlackSet.empty (fn (acc, _) => acc)
     end
 
-  type regs = regs
-  type nodes = zgraph -> zgraph
-
   fun instruction instr ((head, tail), graph) =
     ((head, Tail (Instruction instr, tail)), graph)
   fun label label ((head, tail), graph) =
@@ -257,7 +255,7 @@ struct
 
   fun unreachable (Last (Branch _)) = ()
     | unreachable (Last Exit) = ()
-    | unreachable _ = print "Unreachable code\n"
+    | unreachable _ = raise Fail "unreachable code\n"
 
   fun branch label ((head, tail), graph) =
     ( unreachable tail
