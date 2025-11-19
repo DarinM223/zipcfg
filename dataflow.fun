@@ -59,7 +59,7 @@ struct
     end
 
   (* running a backward analysis *)
-  fun runAnalysis ((fact, analysis): 'a analysis) graph =
+  fun runAnalysis ((fact, analysis): 'a analysis) graph : int =
     let
       val changed = ref false
       fun setBlockFact block =
@@ -104,7 +104,7 @@ struct
   fun solveGraph (pass as (fact, _): 'a pass) graph (exitFact: 'a) : 'a =
     #2 (withoutChangingEntry fact (fn () =>
       generalBackward (passWithExit pass exitFact) graph))
-  and generalBackward (pass as (fact, passFns): 'a pass) graph =
+  and generalBackward (pass as (fact, passFns): 'a pass) graph : int =
     let
       val changed = ref false
       fun setBlockFact b =
@@ -131,11 +131,11 @@ struct
       run fact changed (#init_info fact) setBlockFact blocks
     end
 
-  fun solveAndRewrite pass graph exitFact =
+  fun solveAndRewrite pass graph (exitFact: 'a) : 'a * G.graph =
     ( solveGraph pass graph exitFact
     , backwardRewrite (passWithExit pass exitFact) graph
     )
-  and backwardRewrite (pass as (fact, passFns)) graph =
+  and backwardRewrite (pass as (fact, passFns)) graph : G.graph =
     let
       fun rewriteBlocks rewritten [] = rewritten
         | rewriteBlocks rewritten (b :: bs) =
@@ -176,7 +176,6 @@ struct
               rewriteNextBlock ()
             end
     in
-      rewriteBlocks IntRedBlackMap.empty
-        (List.rev (G.reversePostorderDfs graph))
+      rewriteBlocks G.empty (List.rev (G.reversePostorderDfs graph))
     end
 end
