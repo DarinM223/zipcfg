@@ -134,12 +134,13 @@ local
               AtomRedBlackSet.union (acc, #get livenessFact uid))
            AtomRedBlackSet.empty callContedges)
      | Return (instr, _) => handleInstruction instr AtomRedBlackSet.empty
-  val livenessAnalysis: live_in analysis_functions =
+  val livenessAnalysis: live_in Backwards.analysis_functions =
     { first_in = fn a => fn _ => a
     , middle_in = fn a => fn Instruction instr => handleInstruction instr a
     , last_in = calcLiveOut
     }
-  val livenessAnalysis: live_in analysis = (livenessFact, livenessAnalysis)
+  val livenessAnalysis: live_in Backwards.analysis =
+    (livenessFact, livenessAnalysis)
   val testLiveness: zgraph =
     label (1, "") **> instruction (usesDefs ["%4"] ["%2"], "sub %2, 1, %4")
     **> instruction (usesDefs ["%5"] ["%3"], "mov %3, %5")
@@ -168,7 +169,7 @@ in
      Block 5 livein: { }
      Block 5 liveout: { }
   *)
-  val iterations = runAnalysis livenessAnalysis testLiveness
+  val iterations = Backwards.runAnalysis livenessAnalysis testLiveness
   val () = print ("Liveness iterations: " ^ Int.toString iterations ^ "\n")
   fun printBlock (i, block) =
     let
