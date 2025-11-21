@@ -25,7 +25,7 @@ struct
 
   (* initializes all stored facts, analyzes all blocks,
      and iterates until fixed point is reached *)
-  fun run (fact: 'a fact) (changed: bool ref) (entry_fact: 'a)
+  fun run (fact: 'a fact) (changed: bool ref) (entryFact: 'a)
     (f: G.block -> unit) (blocks: G.block list) : int =
     let
       fun iterate n =
@@ -40,7 +40,7 @@ struct
         end
     in
       List.app (fn block => #set fact (G.id block) (#init_info fact)) blocks;
-      #set fact G.entryUid entry_fact;
+      #set fact G.entryUid entryFact;
       iterate 1
     end
 
@@ -178,6 +178,87 @@ struct
               end
       in
         rewriteBlocks G.empty (List.rev (G.reversePostorderDfs graph))
+      end
+  end
+
+  structure Forwards =
+  struct
+    type 'a analysis_functions =
+      { middle_out: 'a -> G.middle -> 'a
+      , last_outs: 'a
+        -> G.last
+        -> (* Function to set the fact for every successor *)
+          (G.uid -> 'a -> unit)
+        -> unit
+      }
+    type 'a analysis = 'a fact * 'a analysis_functions
+
+    type 'a pass_functions =
+      { middle_out: 'a -> G.middle -> 'a answer
+      , last_outs: 'a -> G.last -> ((G.uid -> 'a -> unit) -> unit) answer
+      }
+    type 'a pass = 'a fact * 'a pass_functions
+
+    fun runAnalysis ((fact, analysis): 'a analysis) {entryFact} graph =
+      let
+        val changed = ref false
+        fun setSuccessorFacts block =
+          let
+            val update = update fact changed
+            fun forward in' (G.Tail (m, t)) =
+                  forward (#middle_out analysis in' m) t
+              | forward in' (G.Last l) =
+                  #last_outs analysis in' l update
+          in
+            forward (#get fact (G.id block)) (#2 block)
+          end
+        val blocks = G.reversePostorderDfs graph
+      in
+        run fact changed entryFact setSuccessorFacts blocks
+      end
+
+    fun passWithExit ((fact, passFns): 'a pass) (exitFactRef: 'a ref) : 'a pass =
+      let
+        fun last_outs in' G.Exit =
+              Dataflow (fn _ => exitFactRef := in')
+          | last_outs in' l =
+              #last_outs passFns in' l
+        val passFns = {middle_out = #middle_out passFns, last_outs = last_outs}
+      in
+        (fact, passFns)
+      end
+
+    fun solveGraph (pass as (fact, _): 'a pass) graph (entryFact: 'a) : 'a =
+      let
+        val exitFactRef = ref (#init_info fact)
+        val _ = generalForward (passWithExit pass exitFactRef) entryFact graph
+      in
+        !exitFactRef
+      end
+    and generalForward (pass as (fact, passFns): 'a pass) entryFact graph : int =
+      let
+        val changed = ref false
+        val update = update fact changed
+        fun setSuccessorFacts (first, tail) =
+          let
+            fun setTailFacts in' (G.Tail (m, t)) =
+                  (case #middle_out passFns in' m of
+                     Dataflow a => setTailFacts a t
+                   | Rewrite g => setTailFacts (solveGraph pass g in') t)
+              | setTailFacts in' (G.Last l) =
+                  (case #last_outs passFns in' l of
+                     Dataflow setter => setter update
+                   | Rewrite g => ignore (solveGraph pass g in'))
+            val in' =
+              case first of
+                G.Entry => entryFact
+              | G.Label ((uid, _), _) => #get fact uid
+          in
+            setTailFacts in' tail
+          end
+        val blocks = G.reversePostorderDfs graph
+      in
+        run fact changed entryFact setSuccessorFacts blocks
       end
   end
 end
