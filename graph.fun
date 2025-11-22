@@ -50,6 +50,7 @@ struct
   type nodes = zgraph -> zgraph
 
   val id = fn (Entry, _) => entryUid | (Label ((uid, _), _), _) => uid
+  val blockLabel = fn (Entry, _) => NONE | (Label (l, _), _) => SOME l
   val empty = IntRedBlackMap.singleton (entryUid, (Entry, Last Exit))
 
   val rec zip: zblock -> block =
@@ -206,11 +207,11 @@ struct
       IntRedBlackMap.foldl expandBlock empty graph
     end
 
-  fun successors Exit = []
-    | successors (Branch (_, l)) = [l]
-    | successors (CBranch (_, l1, l2)) = [l1, l2]
-    | successors (Call {callContedges, ...}) = List.map #node callContedges
-    | successors (Return _) = []
+  fun succsOfLast Exit = []
+    | succsOfLast (Branch (_, l)) = [l]
+    | succsOfLast (CBranch (_, l1, l2)) = [l1, l2]
+    | succsOfLast (Call {callContedges, ...}) = List.map #node callContedges
+    | succsOfLast (Return _) = []
 
   fun reversePostorderDfs (graph: graph) : block list =
     let
@@ -227,7 +228,7 @@ struct
         end
       and getChildren block =
         let
-          val uids = List.map #1 (successors (last (unzip block)))
+          val uids = List.map #1 (succsOfLast (last (unzip block)))
         in
           List.foldl
             (fn (bid, acc) => IntRedBlackMap.lookup (blocks, bid) :: acc

@@ -63,6 +63,7 @@ sig
   end
 
   val id: block -> uid
+  val blockLabel: block -> label option
   val zip: zblock -> block
   val unzip: block -> zblock
   val firstt: head -> first
@@ -106,6 +107,7 @@ sig
   (* rewrite graph, every nontrivial node is replaced with a new subgraph *)
   val expand: (middle -> graph) -> (last -> graph) -> graph -> graph
 
+  val succsOfLast: last -> label list
   (* returns a list in roughly first-to-last order. visiting blocks in this
      order helps a forward dataflow analysis converge quickly. visiting blocks
      in the reverse of this order helps a backward analysis converge quickly *)

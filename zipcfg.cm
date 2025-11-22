@@ -3,5 +3,7 @@ Group is
   $/smlnj-lib.cm
   graph.sig
   graph.fun
+  extra.sig
+  extra.fun
   dataflow.fun
   examples.sml

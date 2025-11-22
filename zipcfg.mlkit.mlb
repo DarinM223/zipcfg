@@ -2,5 +2,7 @@ $(SML_LIB)/basis/basis.mlb
 smlnj-lib.mlb
 graph.sig
 graph.fun
+extra.sig
+extra.fun
 dataflow.fun
 examples.sml
