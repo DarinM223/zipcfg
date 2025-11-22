@@ -6,4 +6,6 @@ Group is
   extra.sig
   extra.fun
   dataflow.fun
+  dominator.sig
+  dominator.fun
   examples.sml

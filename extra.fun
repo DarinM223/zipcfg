@@ -88,12 +88,13 @@ struct
     let
       val rpo = G.reversePostorderDfs graph
       val numNodes = List.length rpo
+      val positionToLabel = positionToLabel' rpo
       val labelToPosition = labelToPosition' numNodes rpo
       val successors = successors' rpo labelToPosition
       val predecessors = predecessors' numNodes successors
     in
       { numNodes = numNodes
-      , positionToLabel = positionToLabel graph
+      , positionToLabel = positionToLabel
       , labelToPosition = labelToPosition
       , successors = successors
       , predecessors = predecessors
