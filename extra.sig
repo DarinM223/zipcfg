@@ -4,6 +4,7 @@ sig
   type position
   val eqPosition: position * position -> bool
   val comparePosition: position * position -> order
+  val positionToInt: position -> int
 
   type mapping
   val !! : mapping * position -> position list
@@ -11,14 +12,14 @@ sig
   type functions =
     { numNodes: int
     , positionToLabel: position -> label option
-    , labelToPosition: label -> position
+    , labelToPosition: label option -> position
     , successors: mapping
     , predecessors: mapping
     }
 
   val numNodes: graph -> int
   val positionToLabel: graph -> position -> label option
-  val labelToPosition: graph -> label -> position
+  val labelToPosition: graph -> label option -> position
   val successors: graph -> mapping
   val predecessors: graph -> mapping
   val precalculate: graph -> functions

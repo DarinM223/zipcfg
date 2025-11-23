@@ -5,6 +5,7 @@ struct
   type position = int
   val eqPosition = op=
   val comparePosition = Int.compare
+  val positionToInt = fn a => a
 
   type mapping = IntRedBlackSet.set array
   val !! = IntRedBlackSet.toList o Array.sub
@@ -12,7 +13,7 @@ struct
   type functions =
     { numNodes: int
     , positionToLabel: position -> label option
-    , labelToPosition: label -> position
+    , labelToPosition: label option -> position
     , successors: mapping
     , predecessors: mapping
     }
@@ -24,7 +25,7 @@ struct
     end
   val positionToLabel = positionToLabel' o G.reversePostorderDfs
 
-  fun labelToPosition' numNodes rpo : label -> position =
+  fun labelToPosition' numNodes rpo : label option -> position =
     let
       val table: int IntHashTable.hash_table =
         IntHashTable.mkTable (numNodes, LibBase.NotFound)
@@ -41,7 +42,8 @@ struct
         | go _ [] = ()
     in
       go 0 rpo;
-      fn (uid, _) => IntHashTable.lookup table uid
+      fn NONE => IntHashTable.lookup table G.entryUid
+       | SOME (uid, _) => IntHashTable.lookup table uid
     end
   fun labelToPosition graph =
     let val rpo = G.reversePostorderDfs graph
@@ -51,8 +53,8 @@ struct
   fun successors' rpo labelToPosition =
     let
       val blockSuccs =
-        IntRedBlackSet.fromList o List.map labelToPosition o G.succsOfLast
-        o G.last o G.unzip
+        IntRedBlackSet.fromList o List.map (labelToPosition o SOME)
+        o G.succsOfLast o G.last o G.unzip
     in
       Array.fromList (List.map blockSuccs rpo)
     end
