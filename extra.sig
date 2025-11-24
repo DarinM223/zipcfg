@@ -7,21 +7,18 @@ sig
   val positionToInt: position -> int
   val positionFromInt: int -> position
 
-  type mapping
-  val !! : mapping * position -> position list
-
   type functions =
     { numNodes: int
     , positionToLabel: position -> label option
     , labelToPosition: label option -> position
-    , successors: mapping
-    , predecessors: mapping
+    , successors: position -> position list
+    , predecessors: position -> position list
     }
 
   val numNodes: graph -> int
   val positionToLabel: graph -> position -> label option
   val labelToPosition: graph -> label option -> position
-  val successors: graph -> mapping
-  val predecessors: graph -> mapping
+  val successors: graph -> position -> position list
+  val predecessors: graph -> position -> position list
   val precalculate: graph -> functions
 end

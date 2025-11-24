@@ -1,7 +1,6 @@
 functor DominatorFn(G: EXTRA where type uid = int) :> DOMINATOR =
 struct
   open G
-  infix !!
   datatype tree = Leaf of G.label option | Node of G.label option * tree list
 
   datatype node_type = Undefined | Defined of G.position
@@ -35,7 +34,7 @@ struct
         let
           val blockPos = labelToPosition (G.blockLabel block)
         in
-          case predecessors !! blockPos of
+          case predecessors blockPos of
             p :: ps =>
               let
                 fun foldPredecessor (pred, acc) =
@@ -73,7 +72,7 @@ struct
         end
       fun go b =
         let
-          val preds = predecessors !! b
+          val preds = predecessors b
           fun goPred p =
             let
               val runner = ref p

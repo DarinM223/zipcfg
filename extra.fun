@@ -8,15 +8,12 @@ struct
   val positionToInt = fn a => a
   val positionFromInt = fn a => a
 
-  type mapping = IntRedBlackSet.set array
-  val !! = IntRedBlackSet.toList o Array.sub
-
   type functions =
     { numNodes: int
     , positionToLabel: position -> label option
     , labelToPosition: label option -> position
-    , successors: mapping
-    , predecessors: mapping
+    , successors: position -> position list
+    , predecessors: position -> position list
     }
 
   val numNodes = List.length o G.reversePostorderDfs
@@ -54,31 +51,41 @@ struct
   fun successors' rpo labelToPosition =
     let
       val blockSuccs =
-        IntRedBlackSet.fromList o List.map (labelToPosition o SOME)
-        o G.succsOfLast o G.last o G.unzip
+        List.map (labelToPosition o SOME) o G.succsOfLast o G.last o G.unzip
+      val succs = Array.fromList (List.map blockSuccs rpo)
     in
-      Array.fromList (List.map blockSuccs rpo)
+      fn p => Array.sub (succs, positionToInt p)
     end
-  fun successors graph : mapping =
+  fun successors graph =
     let val rpo = G.reversePostorderDfs graph
     in successors' rpo (labelToPosition' (List.length rpo) rpo)
     end
 
+  fun mem _ [] = false
+    | mem a (x :: xs) =
+        a = x orelse mem a xs
+
   fun predecessors' max successors =
-    Array.tabulate (max, fn num =>
-      let
-        val result = ref IntRedBlackSet.empty
-        val i = ref 0
-      in
-        while !i < max do
-          ( if IntRedBlackSet.member (Array.sub (successors, !i), num) then
-              result := IntRedBlackSet.add (!result, !i)
-            else
-              ()
-          ; i := !i + 1
-          );
-        !result
-      end)
+    let
+      val preds = Array.tabulate (max, fn num =>
+        let
+          val result = ref IntRedBlackSet.empty
+          val i = ref 0
+        in
+          while !i < max do
+            ( if mem num (successors (!i)) then
+                result := IntRedBlackSet.add (!result, !i)
+              else
+                ()
+            ; i := !i + 1
+            );
+          !result
+        end)
+    in
+      fn p =>
+        List.map positionFromInt (IntRedBlackSet.toList
+          (Array.sub (preds, positionToInt p)))
+    end
   fun predecessors graph =
     let
       val rpo = G.reversePostorderDfs graph
