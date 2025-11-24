@@ -6,6 +6,7 @@ struct
   val eqPosition = op=
   val comparePosition = Int.compare
   val positionToInt = fn a => a
+  val positionFromInt = fn a => a
 
   type mapping = IntRedBlackSet.set array
   val !! = IntRedBlackSet.toList o Array.sub

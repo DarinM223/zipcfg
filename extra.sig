@@ -5,6 +5,7 @@ sig
   val eqPosition: position * position -> bool
   val comparePosition: position * position -> order
   val positionToInt: position -> int
+  val positionFromInt: int -> position
 
   type mapping
   val !! : mapping * position -> position list

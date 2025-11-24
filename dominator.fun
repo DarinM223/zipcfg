@@ -20,10 +20,11 @@ struct
           val finger1 = ref b1
           val finger2 = ref b2
         in
-          while (not (G.eqPosition (!finger1, !finger2))) do
-            ( while (G.comparePosition (!finger1, !finger2) = LESS) do
+          (* positions are in reverse postorder not postorder like the paper *)
+          while not (G.eqPosition (!finger1, !finger2)) do
+            ( while G.comparePosition (!finger1, !finger2) = GREATER do
                 (finger1 := doms (!finger1))
-            ; while (G.comparePosition (!finger2, !finger1) = LESS) do
+            ; while G.comparePosition (!finger2, !finger1) = GREATER do
                 (finger2 := doms (!finger2))
             );
           !finger1
@@ -52,9 +53,41 @@ struct
       val rpo = G.reversePostorderDfs graph
     in
       setDoms (labelToPosition NONE, labelToPosition NONE);
-      while (!changed) do (changed := false; List.app goBlock rpo);
+      while !changed do (changed := false; List.app goBlock rpo);
       doms
     end
 
   fun dominatorTree _ _ = raise Fail "not implemented yet"
+
+  fun dominatorFrontier
+    ({numNodes, labelToPosition, predecessors, ...}: G.functions) idom graph =
+    let
+      val frontier = Array.tabulate (numNodes, fn _ => IntRedBlackSet.empty)
+      fun addToFrontier pos n =
+        let
+          val pos = G.positionToInt pos
+          val n = G.positionToInt n
+        in
+          Array.update (frontier, pos, IntRedBlackSet.add
+            (Array.sub (frontier, pos), n))
+        end
+      fun go b =
+        let
+          val preds = predecessors !! b
+          fun goPred p =
+            let
+              val runner = ref p
+            in
+              while not (G.eqPosition (!runner, idom b)) do
+                (addToFrontier (!runner) b; runner := idom (!runner))
+            end
+        in
+          if List.length preds >= 2 then List.app goPred preds else ()
+        end
+    in
+      IntRedBlackMap.app (go o labelToPosition o G.blockLabel) graph;
+      fn p =>
+        List.map G.positionFromInt (IntRedBlackSet.toList
+          (Array.sub (frontier, G.positionToInt p)))
+    end
 end

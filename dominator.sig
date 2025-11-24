@@ -5,4 +5,8 @@ sig
 
   val idom: functions -> graph -> (position -> position)
   val dominatorTree: (position -> position) -> graph -> tree
+  val dominatorFrontier: functions
+                         -> (position -> position)
+                         -> graph
+                         -> (position -> position list)
 end
