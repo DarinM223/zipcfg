@@ -20,6 +20,8 @@ sig
   val entryUid: uid
 
   type label = uid * string
+  val eqLabel: label * label -> bool
+
   structure Target: TARGET where type label = label
   type regs = Target.reg list
 
@@ -124,6 +126,7 @@ sig
                -> nodes
   val return: {uses: regs} -> nodes
 
+  val showLabel: label -> string
   val showBlock: block -> string
   val showZblock: zblock -> string
   val showGraph: graph -> string

@@ -12,6 +12,8 @@ struct
   val entryUid = 0
 
   type label = uid * string
+  fun eqLabel ((uid1, _), (uid2, _)) = uid1 = uid2
+
   type regs = Target.reg list
 
   datatype locall = Local of bool
