@@ -8,9 +8,7 @@ struct
     val rec tree = fn tree_0 =>
       fn Leaf t0 => "Leaf " ^ "(" ^ showOption G.showLabel t0 ^ ")"
        | Node (t1, t2) =>
-        "Node "
-        ^
-        "("
+        "Node " ^ "("
         ^
         String.concatWith ", "
           [ showOption G.showLabel t1

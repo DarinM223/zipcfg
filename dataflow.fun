@@ -260,5 +260,74 @@ struct
       in
         run fact changed entryFact setSuccessorFacts blocks
       end
+
+    fun checkPropertyMatch (fact: 'a fact) uid a =
+      let
+        val a' = #get fact uid
+        val a = #add_info fact a a'
+      in
+        if
+          #changed fact {old = a, new = a'}
+          orelse #changed fact {old = a', new = a}
+        then
+          raise Fail
+            ("property at label " ^ G.showUid uid
+             ^ " changed after reaching fixed point")
+        else
+          ()
+      end
+
+    fun solveAndRewrite (pass as (fact, _): 'a pass) graph entryFact =
+      let
+        val _ = solveGraph pass graph entryFact
+        val exitRef = ref (#init_info fact)
+        val graph = forwardRewrite (passWithExit pass exitRef) graph entryFact
+      in
+        (!exitRef, graph)
+      end
+    and forwardRewrite (pass as (fact, passFns): 'a pass) graph entryFact =
+      let
+        fun rewriteBlocks rewritten [] = rewritten
+          | rewriteBlocks rewritten (b :: bs) =
+              let
+                fun rewriteNextBlock () =
+                  let
+                    val (first, tail) = b
+                    val a =
+                      case first of
+                        G.Entry => entryFact
+                      | G.Label ((uid, _), _) => #get fact uid
+                  in
+                    propagate (G.First first) a tail rewritten
+                  end
+                and propagate h a (G.Tail (m, t)) rewritten =
+                      (case #middle_out passFns a m of
+                         Dataflow a => propagate (G.Head (h, m)) a t rewritten
+                       | Rewrite g =>
+                           let
+                             val (a, g) = solveAndRewrite pass g a
+                             val (g, h) = G.spliceHead h g
+                             val rewritten = G.Blocks.union g rewritten
+                           in
+                             propagate h a t rewritten
+                           end)
+                  | propagate h a (G.Last l) rewritten =
+                      (case #last_outs passFns a l of
+                         Dataflow set =>
+                           ( set (checkPropertyMatch fact)
+                           ; rewriteBlocks
+                               (G.Blocks.insert (G.zip (h, G.Last l)) rewritten)
+                               bs
+                           )
+                       | Rewrite g =>
+                           rewriteBlocks
+                             (G.Blocks.union (G.spliceHeadOnly h g) rewritten)
+                             bs)
+              in
+                rewriteNextBlock ()
+              end
+      in
+        rewriteBlocks G.empty (G.reversePostorderDfs graph)
+      end
   end
 end

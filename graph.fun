@@ -8,6 +8,7 @@ functor GraphFn
 struct
   structure Target = Target
   type uid = int
+  val showUid = Int.toString
   fun uidEq a b = a = b
   val entryUid = 0
 

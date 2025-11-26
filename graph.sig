@@ -16,6 +16,7 @@ end
 signature GRAPH =
 sig
   type uid
+  val showUid: uid -> string
   val uidEq: uid -> uid -> bool
   val entryUid: uid
 
