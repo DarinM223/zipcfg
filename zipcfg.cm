@@ -5,6 +5,7 @@ Group is
   graph.fun
   extra.sig
   extra.fun
+  dataflow.sig
   dataflow.fun
   dominator.sig
   dominator.fun

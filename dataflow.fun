@@ -1,5 +1,7 @@
-functor DataflowFn (structure G: GRAPH) =
+functor DataflowFn (structure G: GRAPH): DATAFLOW =
 struct
+  structure G = G
+
   type 'a fact =
     { init_info: 'a (* lattice bottom element *)
     , add_info: 'a -> 'a -> 'a (* lattice join (least upper bound) *)
