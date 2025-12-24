@@ -31,7 +31,7 @@ sig
 
     val runAnalysis: 'a analysis -> G.graph -> int
     val solveGraph: 'a pass -> G.graph -> 'a -> 'a
-    val solveAndRewrite: 'a pass -> G.graph -> 'a -> 'a * G.graph
+    val solveAndRewrite: 'a pass -> G.graph -> 'a -> 'a * (G.graph * bool)
   end
   structure Forwards:
   sig
@@ -53,6 +53,6 @@ sig
 
     val runAnalysis: 'a analysis -> {entryFact: 'a} -> G.graph -> int
     val solveGraph: 'a pass -> G.graph -> 'a -> 'a
-    val solveAndRewrite: 'a pass -> G.graph -> 'a -> 'a * G.graph
+    val solveAndRewrite: 'a pass -> G.graph -> 'a -> 'a * (G.graph * bool)
   end
 end

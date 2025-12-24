@@ -134,53 +134,59 @@ struct
         run fact changed (#init_info fact) setBlockFact blocks
       end
 
-    fun solveAndRewrite pass graph (exitFact: 'a) : 'a * G.graph =
+    fun solveAndRewrite pass graph exitFact changed =
       ( solveGraph pass graph exitFact
-      , backwardRewrite (passWithExit pass exitFact) graph
+      , backwardRewrite (passWithExit pass exitFact) graph changed
       )
-    and backwardRewrite (pass as (fact, passFns)) graph : G.graph =
+    and backwardRewrite (pass as (fact, passFns)) graph changed : G.graph * bool =
       let
-        fun rewriteBlocks rewritten [] = rewritten
-          | rewriteBlocks rewritten (b :: bs) =
+        fun rewriteBlocks rewritten [] changed = (rewritten, changed)
+          | rewriteBlocks rewritten (b :: bs) changed =
               let
                 fun rewriteNextBlock () =
                   let
                     val (head, last) = G.gotoEnd (G.unzip b)
                   in
                     case #last_in passFns last of
-                      Dataflow a => propagate head a (G.Last last) rewritten
+                      Dataflow a =>
+                        propagate head a (G.Last last) rewritten changed
                     | Rewrite g =>
                         let
-                          val (a, g) = solveAndRewrite pass g (#init_info fact)
+                          val (a, (g, _)) =
+                            solveAndRewrite pass g (#init_info fact) changed
                           val (t, g) = G.removeEntry g
                           val rewritten = G.Blocks.union g rewritten
                         in
-                          propagate head a t rewritten
+                          propagate head a t rewritten true
                         end
                   end
-                and propagate (G.Head (h, m)) a t rewritten =
+                and propagate (G.Head (h, m)) a t rewritten changed =
                       (case #middle_in passFns a m of
-                         Dataflow a => propagate h a (G.Tail (m, t)) rewritten
+                         Dataflow a =>
+                           propagate h a (G.Tail (m, t)) rewritten changed
                        | Rewrite g =>
                            let
-                             val (a, g) = solveAndRewrite pass g a
+                             val (a, (g, _)) = solveAndRewrite pass g a changed
                              val (t, g) = G.spliceTail g t
                              val rewritten = G.Blocks.union g rewritten
                            in
-                             propagate h a t rewritten
+                             propagate h a t rewritten true
                            end)
-                  | propagate (G.First f) a t rewritten =
+                  | propagate (G.First f) a t rewritten changed =
                       (case #first_in passFns a f of
                          Dataflow _ =>
                            rewriteBlocks (G.Blocks.insert (f, t) rewritten) bs
+                             changed
                        | Rewrite _ =>
                            raise Fail "rewriting a label in backwards dataflow")
               in
                 rewriteNextBlock ()
               end
       in
-        rewriteBlocks G.empty (List.rev (G.reversePostorderDfs graph))
+        rewriteBlocks G.empty (List.rev (G.reversePostorderDfs graph)) changed
       end
+    val solveAndRewrite = fn pass =>
+      fn graph => fn exitFact => solveAndRewrite pass graph exitFact false
   end
 
   structure Forwards =
@@ -279,18 +285,19 @@ struct
           ()
       end
 
-    fun solveAndRewrite (pass as (fact, _): 'a pass) graph entryFact =
+    fun solveAndRewrite (pass as (fact, _)) graph entryFact changed =
       let
         val _ = solveGraph pass graph entryFact
         val exitRef = ref (#init_info fact)
-        val graph = forwardRewrite (passWithExit pass exitRef) graph entryFact
+        val result =
+          forwardRewrite (passWithExit pass exitRef) graph entryFact changed
       in
-        (!exitRef, graph)
+        (!exitRef, result)
       end
-    and forwardRewrite (pass as (fact, passFns): 'a pass) graph entryFact =
+    and forwardRewrite (pass as (fact, passFns)) graph entryFact changed =
       let
-        fun rewriteBlocks rewritten [] = rewritten
-          | rewriteBlocks rewritten (b :: bs) =
+        fun rewriteBlocks rewritten [] changed = (rewritten, changed)
+          | rewriteBlocks rewritten (b :: bs) changed =
               let
                 fun rewriteNextBlock () =
                   let
@@ -300,36 +307,39 @@ struct
                         G.Entry => entryFact
                       | G.Label ((uid, _), _) => #get fact uid
                   in
-                    propagate (G.First first) a tail rewritten
+                    propagate (G.First first) a tail rewritten changed
                   end
-                and propagate h a (G.Tail (m, t)) rewritten =
+                and propagate h a (G.Tail (m, t)) rewritten changed =
                       (case #middle_out passFns a m of
-                         Dataflow a => propagate (G.Head (h, m)) a t rewritten
+                         Dataflow a =>
+                           propagate (G.Head (h, m)) a t rewritten changed
                        | Rewrite g =>
                            let
-                             val (a, g) = solveAndRewrite pass g a
+                             val (a, (g, _)) = solveAndRewrite pass g a changed
                              val (g, h) = G.spliceHead h g
                              val rewritten = G.Blocks.union g rewritten
                            in
-                             propagate h a t rewritten
+                             propagate h a t rewritten true
                            end)
-                  | propagate h a (G.Last l) rewritten =
+                  | propagate h a (G.Last l) rewritten changed =
                       (case #last_outs passFns a l of
                          Dataflow set =>
                            ( set (checkPropertyMatch fact)
                            ; rewriteBlocks
                                (G.Blocks.insert (G.zip (h, G.Last l)) rewritten)
-                               bs
+                               bs changed
                            )
                        | Rewrite g =>
                            rewriteBlocks
                              (G.Blocks.union (G.spliceHeadOnly h g) rewritten)
-                             bs)
+                             bs true)
               in
                 rewriteNextBlock ()
               end
       in
-        rewriteBlocks G.empty (G.reversePostorderDfs graph)
+        rewriteBlocks G.empty (G.reversePostorderDfs graph) changed
       end
+    val solveAndRewrite = fn pass =>
+      fn graph => fn entryFact => solveAndRewrite pass graph entryFact false
   end
 end
