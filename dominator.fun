@@ -1,4 +1,4 @@
-functor DominatorFn(G: EXTRA where type uid = int) :> DOMINATOR =
+functor DominatorFn(G: EXTRA where type uid = int): DOMINATOR =
 struct
   open G
   datatype tree = Leaf of G.label option | Node of G.label option * tree list
@@ -72,8 +72,10 @@ struct
                   (doms pred; intersect (pred, acc))
                   handle LibBase.NotFound => acc
                 val newIdom = List.foldl foldPredecessor p ps
+                val shouldUpdate = not (G.eqPosition (doms blockPos, newIdom))
+                                   handle LibBase.NotFound => true
               in
-                if not (G.eqPosition (doms blockPos, newIdom)) then
+                if shouldUpdate then
                   (setDoms (blockPos, newIdom); changed := true)
                 else
                   ()

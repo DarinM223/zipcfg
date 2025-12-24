@@ -68,7 +68,7 @@ struct
   (* A target instruction is the simplified equivalent to Rtl.rtl for qc--. *)
   type instr = {uses: AtomRedBlackSet.set, defs: AtomRedBlackSet.set} * string
   val defUseDefs = {uses = AtomRedBlackSet.empty, defs = AtomRedBlackSet.empty}
-  val showLabel = fn (_, s) => s
+  val showLabel = fn (i, s) => s ^ Int.toString i
   val showInstr = fn (_, i) => i
 
   datatype cond = LT | LE | GT | GE | EQ | NE
@@ -180,4 +180,54 @@ in
       print ("Block " ^ Int.toString i ^ " liveout: " ^ showLive liveOut ^ "\n")
     end
   val () = IntRedBlackMap.appi printBlock testLiveness
+end
+
+local
+  structure TestGraph =
+    GraphFn
+      (structure Target = Target
+       val showRegs = fn t0 => "[" ^ String.concatWith ", " t0 ^ "]")
+  structure TestGraph = ExtraFn(TestGraph)
+  structure Dominator = DominatorFn(TestGraph)
+  open TestGraph
+  (*
+       NONE
+      /    \
+     V      V
+     5      4
+     |     / \
+     V    V   V
+     1<-->2<->3
+  *)
+  val graph: zgraph =
+    cbranch {uses = []} Target.EQ {ifso = (5, ""), ifnot = (4, "")}
+    **> label (5, "") **> branch (1, "") **> label (4, "")
+    **> cbranch {uses = []} Target.EQ {ifso = (2, ""), ifnot = (3, "")}
+    **> label (3, "") **> branch (2, "") **> label (2, "")
+    **> cbranch {uses = []} Target.EQ {ifso = (1, ""), ifnot = (3, "")}
+    **> label (1, "") **> branch (2, "") **> entry empty
+  val graph = unfocus graph
+  val () = print (showGraph graph ^ "\n")
+  val fns = precalculate graph
+  val idom = Dominator.idom fns graph
+
+  type opt_label = Target.label option
+  local
+    fun showOption f (SOME s) = "SOME " ^ f s
+      | showOption _ NONE = "NONE"
+  in val showOpt_label = showOption Target.showLabel
+  end
+
+  fun printIdom label =
+    print
+      (showOpt_label (#positionToLabel fns (idom (#labelToPosition fns label)))
+       ^ "\n")
+in
+  (* Should print 6 NONE *)
+  val () = printIdom NONE
+  val () = printIdom (SOME (1, ""))
+  val () = printIdom (SOME (2, ""))
+  val () = printIdom (SOME (3, ""))
+  val () = printIdom (SOME (4, ""))
+  val () = printIdom (SOME (5, ""))
 end

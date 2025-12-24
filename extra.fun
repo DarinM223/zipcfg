@@ -1,4 +1,4 @@
-functor Extra(G: GRAPH where type uid = int) :> EXTRA =
+functor ExtraFn(G: GRAPH where type uid = int) :> EXTRA where type uid = G.uid =
 struct
   open G
 
