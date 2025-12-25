@@ -207,7 +207,6 @@ local
     **> cbranch {uses = []} Target.EQ {ifso = (1, ""), ifnot = (3, "")}
     **> label (1, "") **> branch (2, "") **> entry empty
   val graph = unfocus graph
-  val () = print (showGraph graph ^ "\n")
   val fns = precalculate graph
   val idom = Dominator.idom fns graph
 
@@ -222,6 +221,22 @@ local
     print
       (showOpt_label (#positionToLabel fns (idom (#labelToPosition fns label)))
        ^ "\n")
+
+  val tree = Dominator.dominatorTree fns idom graph
+  val expected =
+    let
+      open Dominator
+    in
+      Node
+        ( NONE
+        , [ Leaf (SOME (5, ""))
+          , Leaf (SOME (4, ""))
+          , Leaf (SOME (3, ""))
+          , Leaf (SOME (2, ""))
+          , Leaf (SOME (1, ""))
+          ]
+        )
+    end
 in
   (* Should print 6 NONE *)
   val () = printIdom NONE
@@ -230,4 +245,7 @@ in
   val () = printIdom (SOME (3, ""))
   val () = printIdom (SOME (4, ""))
   val () = printIdom (SOME (5, ""))
+  val () = print (Dominator.showTree tree ^ "\n")
+  (* Should print true *)
+  val () = print (Bool.toString (Dominator.eqTree (tree, expected)) ^ "\n")
 end

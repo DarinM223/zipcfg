@@ -92,18 +92,21 @@ struct
   fun dominatorTree
     ({numNodes, labelToPosition, positionToLabel, ...}: G.functions) idom graph =
     let
-      val children = Array.tabulate (numNodes, fn _ => IntRedBlackSet.empty)
+      val childrenMapping =
+        Array.tabulate (numNodes, fn _ => IntRedBlackSet.empty)
       fun addChildren block =
         let
           val parent = G.positionToInt (idom block)
         in
-          Array.update (children, parent, IntRedBlackSet.add
-            (Array.sub (children, parent), G.positionToInt block))
+          Array.update (childrenMapping, parent, IntRedBlackSet.add
+            (Array.sub (childrenMapping, parent), G.positionToInt block))
         end
       fun buildTree node =
         let
-          val children = List.map G.positionFromInt (IntRedBlackSet.toList
-            (Array.sub (children, G.positionToInt node)))
+          val children =
+            (List.filter (fn pos => not (G.eqPosition (pos, node)))
+             o List.map G.positionFromInt o IntRedBlackSet.toList)
+              (Array.sub (childrenMapping, G.positionToInt node))
         in
           case children of
             [] => Leaf (positionToLabel node)
