@@ -249,3 +249,86 @@ in
   (* Should print true *)
   val () = print (Bool.toString (Dominator.eqTree (tree, expected)) ^ "\n")
 end
+
+local
+  structure TestGraph =
+    GraphFn
+      (structure Target = Target
+       val showRegs = fn t0 => "[" ^ String.concatWith ", " t0 ^ "]")
+  structure TestGraph = ExtraFn(TestGraph)
+  structure Dominator = DominatorFn(TestGraph)
+  open TestGraph
+  (* Figure 19.4 from Modern Compiler Implementation in ML *)
+  val graph: zgraph =
+    branch (2, "") **> label (2, "")
+    **> cbranch {uses = []} Target.EQ {ifso = (3, ""), ifnot = (4, "")}
+    **> label (3, "")
+    **> cbranch {uses = []} Target.EQ {ifso = (5, ""), ifnot = (6, "")}
+    **> label (4, "") **> return {uses = []} **> label (5, "")
+    **> branch (7, "") **> label (6, "") **> branch (7, "") **> label (7, "")
+    **> branch (2, "") **> entry empty
+  val graph = unfocus graph
+  val fns = precalculate graph
+  val idom = Dominator.idom fns graph
+
+  type opt_label = Target.label option
+  type opt_label_list = opt_label list
+  local
+    fun showOption f (SOME s) = "SOME " ^ f s
+      | showOption _ NONE = "NONE"
+  in val showOpt_label = showOption Target.showLabel
+  end
+  val showOpt_label_list = fn t0 =>
+    "[" ^ String.concatWith ", " (List.map showOpt_label t0) ^ "]"
+
+  fun printIdom label =
+    print
+      (showOpt_label (#positionToLabel fns (idom (#labelToPosition fns label)))
+       ^ "\n")
+
+  val tree = Dominator.dominatorTree fns idom graph
+  val expected =
+    let
+      open Dominator
+    in
+      Node
+        ( NONE
+        , [Node
+             ( SOME (2, "")
+             , [ Node
+                   ( SOME (3, "")
+                   , [ Leaf (SOME (5, ""))
+                     , Leaf (SOME (6, ""))
+                     , Leaf (SOME (7, ""))
+                     ]
+                   )
+               , Leaf (SOME (4, ""))
+               ]
+             )]
+        )
+    end
+  val df = Dominator.dominatorFrontier fns idom graph
+
+  val showDf =
+    showOpt_label_list o List.map (#positionToLabel fns) o df
+    o #labelToPosition fns
+in
+  val () = print (Dominator.showTree tree ^ "\n")
+  (* Should print true *)
+  val () = print (Bool.toString (Dominator.eqTree (tree, expected)) ^ "\n")
+  (* Should print:
+     []
+     [SOME 2]
+     [SOME 2]
+     []
+     [SOME 7]
+     [SOME 7]
+     [SOME 2] *)
+  val () = print (showDf NONE ^ "\n")
+  val () = print (showDf (SOME (2, "")) ^ "\n")
+  val () = print (showDf (SOME (3, "")) ^ "\n")
+  val () = print (showDf (SOME (4, "")) ^ "\n")
+  val () = print (showDf (SOME (5, "")) ^ "\n")
+  val () = print (showDf (SOME (6, "")) ^ "\n")
+  val () = print (showDf (SOME (7, "")) ^ "\n")
+end
