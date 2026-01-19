@@ -38,7 +38,7 @@ local
 
   val example: nodes = fn zgraph =>
     instruction "a" **> instruction "b" **> return {uses = []} **> zgraph
-  val example: graph = unfocus (example (entry empty))
+  val example: graph = unfocus (example (focusEntry empty))
 
   val testPostorder: graph =
     List.foldl (fn ((k, v), acc) => IntRedBlackMap.insert (acc, k, v))
@@ -151,7 +151,7 @@ local
     **> label (3, "") **> instruction (usesDefs ["%7"] ["%1"], "mov %1, %7")
     **> label (4, "") **> instruction (usesDefs ["%8"] ["%2"], "mov %2, %8")
     **> cbranch {uses = ["%2"]} Target.LT {ifso = (2, ""), ifnot = (5, "")}
-    **> label (5, "") **> entry empty
+    **> label (5, "") **> focusEntry empty
   val testLiveness = unfocus testLiveness
 in
   (* Should print:
@@ -205,7 +205,7 @@ local
     **> cbranch {uses = []} Target.EQ {ifso = (2, ""), ifnot = (3, "")}
     **> label (3, "") **> branch (2, "") **> label (2, "")
     **> cbranch {uses = []} Target.EQ {ifso = (1, ""), ifnot = (3, "")}
-    **> label (1, "") **> branch (2, "") **> entry empty
+    **> label (1, "") **> branch (2, "") **> focusEntry empty
   val graph = unfocus graph
   val fns = precalculate graph
   val idom = Dominator.idom fns graph
@@ -266,7 +266,7 @@ local
     **> cbranch {uses = []} Target.EQ {ifso = (5, ""), ifnot = (6, "")}
     **> label (4, "") **> return {uses = []} **> label (5, "")
     **> branch (7, "") **> label (6, "") **> branch (7, "") **> label (7, "")
-    **> branch (2, "") **> entry empty
+    **> branch (2, "") **> focusEntry empty
   val graph = unfocus graph
   val fns = precalculate graph
   val idom = Dominator.idom fns graph

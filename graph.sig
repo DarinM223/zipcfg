@@ -77,9 +77,9 @@ sig
   val gotoEnd: zblock -> head * last
 
   (* focus on edge out of entry *)
-  val entry: graph -> zgraph
+  val focusEntry: graph -> zgraph
   (* focus on edge into default exit *)
-  val exit: graph -> zgraph
+  val focusExit: graph -> zgraph
   (* focus on edge out of node with uid *)
   val focus: uid -> graph -> zgraph
   (* lose focus *)
@@ -126,6 +126,7 @@ sig
                -> {ifso: label, ifnot: label}
                -> nodes
   val return: {uses: regs} -> nodes
+  val exit: nodes
 
   val showLabel: label -> string
   val showBlock: block -> string
