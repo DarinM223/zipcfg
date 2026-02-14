@@ -317,6 +317,7 @@ struct
                            let
                              val (a, (g, _)) = solveAndRewrite pass g a changed
                              val (g, h) = G.spliceHead h g
+                             val (_, g) = G.removeEntry g
                              val rewritten = G.Blocks.union g rewritten
                            in
                              propagate h a t rewritten true
